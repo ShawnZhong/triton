@@ -58,33 +58,31 @@ def all_gather(x: torch.Tensor, dim=0) -> torch.Tensor:
         return x
 
 
-def reduce_scatter(x: torch.Tensor, token_mask: torch.Tensor = None, dim=0) -> torch.Tensor:
+def reduce_scatter(x: torch.Tensor, gpu_idx: torch.Tensor = None, dim=0) -> torch.Tensor:
     if _is_distributed_launch():
         world_size = dist.get_world_size()
-        if token_mask is not None:
-            # build the padded shape
-            shape = list(x.shape)
-            shape[dim] = token_mask.shape[0]
-            # create a zero tensor, scatter x into it where mask is True, then split
-            x_new = x.new_zeros(shape)
-            # Expand token_mask to match x's shape for assignment
-            index = [slice(None)] * x.dim()
-            index[dim] = token_mask
-            x_new[index] = x
-            x_list = list(x_new.chunk(world_size, dim=dim))
+        if gpu_idx is not None:
+            assert dim == 0, "gpu_idx only works with dim=0"
+            # Use all to all to simulate reduce scatter
+            input_split_sizes = []
+            for i in range(world_size):
+                input_split_sizes.append((gpu_idx == i).sum().item())
+            sizes = all_gather(torch.tensor(input_split_sizes, device=x.device), dim=0)
+            output_split_sizes = sizes[:, dist.get_rank()].tolist()
+            all_to_all_single(x, input_split_sizes=output_split_sizes, output_split_sizes=input_split_sizes)
         else:
             x_list = list(x.chunk(world_size, dim=dim))
-        # build output shape
-        shape = x_list[0].shape
-        # reduce scatter into the single tensor
-        # check if dtype is fp8, then convert it to float16 before reducing
-        if x.dtype not in [torch.float16, torch.bfloat16, torch.float32]:
-            x_list = [x.to(torch.float16) for x in x_list]
-            out = x.new_empty(shape, dtype=torch.float16)
-        else:
-            out = x.new_empty(shape, dtype=x.dtype)
-        dist.reduce_scatter(out, x_list)
-        return out
+            # build output shape
+            shape = x_list[0].shape
+            # reduce scatter into the single tensor
+            # check if dtype is fp8, then convert it to float16 before reducing
+            if x.dtype not in [torch.float16, torch.bfloat16, torch.float32]:
+                x_list = [x.to(torch.float16) for x in x_list]
+                out = x.new_empty(shape, dtype=torch.float16)
+            else:
+                out = x.new_empty(shape, dtype=x.dtype)
+            dist.reduce_scatter(out, x_list)
+            return out
     else:
         return x
 
@@ -113,25 +111,24 @@ def routing(logits, n_expts_act, sm_first=False, expt_indx=None, n_rows=None, EP
         # Sort each token's selections by expert
         expt_indx, sort_indices = torch.sort(expt_indx, dim=1, stable=True)
         expt_scal = torch.gather(expt_scal, 1, sort_indices)
-        # Distributed-DP
-        expt_scal = all_gather(expt_scal, dim=0)
-        expt_indx = all_gather(expt_indx, dim=0)
         chunk_size = n_expts_tot // EP
         ep_indx = dist.get_rank() // TP
-        # Distributed-EP
+        gpu_idx = expt_indx // chunk_size
         if EP > 1:
-            # keep only the experts assigned to this rank
-            local_expt_mask = (expt_indx // chunk_size) == ep_indx
-            # mask out rows with all false, meaning that this token is not assigned to any expert belonging to this rank
-            token_mask = torch.any(local_expt_mask, dim=1)
-            expt_scal, expt_indx, local_expt_mask = [t[token_mask] for t in (expt_scal, expt_indx, local_expt_mask)]
-            # normalize the expert ids
+            # Distributed-EP
+            # figure out how many tokens are assigned to each expert
+            input_split_sizes = []
+            for i in range(dist.get_world_size()):
+                input_split_sizes.append((gpu_idx == i).sum().item())
+            sizes = all_gather(torch.tensor(input_split_sizes, device=logits.device), dim=0)
+            output_split_sizes = sizes[:, dist.get_rank()].tolist()
+            expt_scal = all_to_all_single(expt_scal, output_split_sizes, input_split_sizes)
+            expt_indx = all_to_all_single(expt_indx, output_split_sizes, input_split_sizes)
             expt_indx -= ep_indx * chunk_size
-            # mask values associated with invalid expert ids
-            expt_scal = expt_scal.masked_fill(~local_expt_mask, 0)
-            expt_indx = expt_indx.masked_fill(~local_expt_mask, n_expts_tot)
         else:
-            token_mask = None
+            # Distributed-DP
+            expt_scal = all_gather(expt_scal, dim=0)
+            expt_indx = all_gather(expt_indx, dim=0)
         # flatten topk data
         expt_scal = expt_scal.reshape(-1)
         expt_indx = expt_indx.reshape(-1).to(torch.int32)
@@ -141,17 +138,15 @@ def routing(logits, n_expts_act, sm_first=False, expt_indx=None, n_rows=None, EP
         # topk_indx: [2 (row0), 1 (row1), 3 (row2), 4 (row3), 5 (row4), ...]
         expt_indx, topk_indx = torch.sort(expt_indx, stable=True)
         gate_indx = torch.argsort(topk_indx, stable=True)
-        topk_indx[expt_indx == n_expts_tot] = -1
-        gate_indx[gate_indx >= (expt_indx != n_expts_tot).sum()] = -1
         gate_scal = expt_scal[topk_indx]
         # histogram of tokens over experts
-        hist = torch.histc(expt_indx[expt_indx != n_expts_tot], bins=chunk_size, min=0, max=chunk_size)
+        hist = torch.histc(expt_indx, bins=chunk_size, min=0, max=chunk_size)
         # pack the matmul data structure
         gather_indx = GatherIndx(src_indx=topk_indx.int(), dst_indx=gate_indx.int())
         scatter_indx = ScatterIndx(src_indx=gate_indx.int(), dst_indx=topk_indx.int())
-        n_gates = topk_indx[expt_indx != n_expts_tot].numel()
+        n_gates = topk_indx.numel()
         expt_data = compute_expt_data(hist, n_expts_tot // EP, n_gates)
         return RoutingData(gate_scal, hist, n_expts_tot // EP, n_expts_act,
-                           expt_data=expt_data), gather_indx, scatter_indx, token_mask
+                           expt_data=expt_data), gather_indx, scatter_indx, gpu_idx
     else:
         return *triton_kernels.routing.routing(logits, n_expts_act, sm_first, expt_indx, EP, n_rows), None

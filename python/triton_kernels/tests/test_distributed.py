@@ -236,14 +236,12 @@ def distributed_run(rank, world_size, batch, dim1, dim2, n_expts_tot, n_expts_ac
         x = triton_dist.all_gather(x, dim=0)
         if n_expts_tot > 1:
             logits = matmul_ogs(xg, wg, bg, precision_config=pcg)
-            rdata, gi, si, tm = triton_dist.routing(logits, n_expts_act, EP=EP, TP=TP)
+            rdata, gi, si, gpu_idx = triton_dist.routing(logits, n_expts_act, EP=EP, TP=TP)
         else:
-            rdata = gi = si = tm = None
-        if tm is not None:
-            x = x[tm]
+            rdata = gi = si = gpu_idx = None
         x = matmul_ogs(x, w1, b1, rdata, gather_indx=gi, precision_config=pc1, fused_activation=act)
         x = matmul_ogs(x, w2, b2 if rank % TP == 0 else None, rdata, scatter_indx=si, precision_config=pc2)
-        x = triton_dist.reduce_scatter(x, token_mask=tm, dim=0)
+        x = triton_dist.reduce_scatter(x, gpu_idx=gpu_idx, dim=0)
         # gather the result from all GPUs, just for verification
         return triton_dist.all_gather(x, dim=0)
 
