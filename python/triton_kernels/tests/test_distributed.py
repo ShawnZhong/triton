@@ -72,6 +72,7 @@ def test_reduce_scatter_distributed_with_metadata(monkeypatch):
     monkeypatch.setenv("WORLD_SIZE", "2")
     monkeypatch.setattr(dist, "is_initialized", lambda: True)
     monkeypatch.setattr(dist, "get_world_size", lambda: 2)
+    monkeypatch.setattr(dist, "get_rank", lambda: 0)
     monkeypatch.setattr(dist, "all_to_all", dummy_all_to_all)
     monkeypatch.setattr(dist, "all_gather", dummy_all_gather)
 
