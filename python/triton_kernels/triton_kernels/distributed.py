@@ -97,8 +97,9 @@ def reduce_scatter(input_tensor: torch.Tensor, metadata: ReduceScatterMetadata =
             shape = input_list[0].shape
             dtype = cast(input_tensor.dtype)
             input_list = [x.to(dtype) for x in input_list]
-            out = input_tensor.new_empty(shape, dtype=dtype)
-            dist.reduce_scatter(out, input_list)
+            output_tensor = input_tensor.new_empty(shape, dtype=dtype)
+            dist.reduce_scatter(output_tensor, input_list)
+            return output_tensor
     else:
         return input_tensor
 
