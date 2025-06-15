@@ -118,8 +118,8 @@ def test_all_to_all(monkeypatch):
     monkeypatch.setattr(dist, "all_to_all", dummy_all_to_all)
     monkeypatch.setattr(dist, "all_gather", dummy_all_gather)
 
-    input = torch.tensor([[1, 2], [3, 4]], dtype=torch.float32)
-    output_list = triton_dist.all_to_all(input)
+    input_list = [torch.tensor([1, 2], dtype=torch.float32), torch.tensor([3, 4], dtype=torch.float32)]
+    output_list = triton_dist.all_to_all(input_list)
     assert torch.equal(output_list[0], torch.tensor([1, 2], dtype=torch.float32))
     assert torch.equal(output_list[1], torch.tensor([1, 2], dtype=torch.float32))
     assert len(output_list) == 2
