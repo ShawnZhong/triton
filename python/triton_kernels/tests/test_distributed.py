@@ -23,6 +23,10 @@ def dummy_all_to_all(input_list, dim):
     return [input_list[0], input_list[0]]
 
 
+def dummy_reduce_scatter(out, x_list):
+    out.copy_(x_list[0] * 2)
+
+
 def test_all_gather_non_distributed(monkeypatch):
     monkeypatch.setenv("WORLD_SIZE", "1")
     x = torch.randn(4, 5)
@@ -54,7 +58,7 @@ def test_reduce_scatter_distributed(monkeypatch):
     monkeypatch.setenv("WORLD_SIZE", "2")
     monkeypatch.setattr(dist, "is_initialized", lambda: True)
     monkeypatch.setattr(dist, "get_world_size", lambda: 2)
-    monkeypatch.setattr(dist, "reduce_scatter", lambda out, x_list: out.copy_(x_list[0]))
+    monkeypatch.setattr(dist, "reduce_scatter", dummy_reduce_scatter)
 
     x = torch.randn(4, 6)
     expected = x.chunk(2, dim=0)[0]
@@ -67,7 +71,8 @@ def test_reduce_scatter_distributed_with_metadata(monkeypatch):
     monkeypatch.setenv("WORLD_SIZE", "2")
     monkeypatch.setattr(dist, "is_initialized", lambda: True)
     monkeypatch.setattr(dist, "get_world_size", lambda: 2)
-    monkeypatch.setattr(dist, "reduce_scatter", lambda out, x_list: out.copy_(x_list[0]))
+    monkeypatch.setattr(dist, "all_to_all", dummy_all_to_all)
+    monkeypatch.setattr(dist, "all_gather", dummy_all_gather)
 
     input_split_sizes = [1, 1]
     ep_indx = torch.tensor([[0], [1]])
