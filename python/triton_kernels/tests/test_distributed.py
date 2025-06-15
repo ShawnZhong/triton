@@ -19,8 +19,9 @@ def dummy_all_gather(out, x):
     out[1].copy_(x)
 
 
-def dummy_all_to_all(input_list, dim):
-    return [input_list[0], input_list[0]]
+def dummy_all_to_all(output_list, input_list):
+    output_list[0].copy_(input_list[0])
+    output_list[1].copy_(input_list[0])
 
 
 def dummy_reduce_scatter(out, x_list):
