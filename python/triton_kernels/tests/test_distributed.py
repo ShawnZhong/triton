@@ -46,7 +46,7 @@ def test_all_gather_distributed(monkeypatch, dim):
 def test_reduce_scatter_non_distributed(monkeypatch):
     monkeypatch.setenv("WORLD_SIZE", "1")
     x = torch.randn(4, 6)
-    result = triton_dist.reduce_scatter(x, token_mask=None, dim=0)
+    result = triton_dist.reduce_scatter(x, dim=0)
     torch.testing.assert_close(result, x)
 
 
