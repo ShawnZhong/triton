@@ -61,7 +61,7 @@ def test_reduce_scatter_distributed(monkeypatch):
     monkeypatch.setattr(dist, "reduce_scatter", dummy_reduce_scatter)
 
     x = torch.randn(4, 6)
-    expected = x.chunk(2, dim=0)[0]
+    expected = x.chunk(2, dim=0)[0] * 2
 
     result = triton_dist.reduce_scatter(x, dim=0)
     torch.testing.assert_close(result, expected)
@@ -116,6 +116,7 @@ def test_all_to_all(monkeypatch):
     monkeypatch.setattr(dist, "get_world_size", lambda: 2)
     monkeypatch.setattr(dist, "get_rank", lambda: 0)
     monkeypatch.setattr(dist, "all_to_all", dummy_all_to_all)
+    monkeypatch.setattr(dist, "all_gather", dummy_all_gather)
 
     input = torch.tensor([[1, 2], [3, 4]], dtype=torch.float32)
     output_list = triton_dist.all_to_all(input)
