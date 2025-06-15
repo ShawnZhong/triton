@@ -120,7 +120,9 @@ def test_all_to_all(monkeypatch):
 
     input = torch.tensor([[1, 2], [3, 4]], dtype=torch.float32)
     output_list = triton_dist.all_to_all(input)
-    assert torch.equal(output_list, [torch.tensor([1, 2], dtype=torch.float32)] * 2)
+    assert torch.equal(output_list[0], torch.tensor([1, 2], dtype=torch.float32))
+    assert torch.equal(output_list[1], torch.tensor([1, 2], dtype=torch.float32))
+    assert len(output_list) == 2
 
 
 def quantize(w, dtype, **opt):
