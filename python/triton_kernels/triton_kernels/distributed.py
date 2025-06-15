@@ -84,10 +84,9 @@ def reduce_scatter(input_tensor: torch.Tensor, metadata: ReduceScatterMetadata =
             output_list = all_to_all(input_list, dim=0)
             n_tokens = metadata.ep_indx.size(dim)
             other_dims = input_tensor.shape[1:]
-            output_tensor = input_tensor.new_zeros((n_tokens // world_size, ) + other_dims,
-                                                   dtype=cast(input_tensor.dtype))
-            for i in world_size:
-                ep_rank = i // metadata.EP
+            output_tensor = input_tensor.new_zeros((n_tokens, ) + other_dims, dtype=cast(input_tensor.dtype))
+            for i in range(world_size):
+                ep_rank = i % metadata.EP
                 mask = torch.any(metadata.ep_indx == ep_rank, dim=1)
                 output_tensor[mask] += output_list[i]
             return output_tensor
