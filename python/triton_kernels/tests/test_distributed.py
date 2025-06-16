@@ -77,7 +77,7 @@ def test_reduce_scatter_distributed_with_metadata(monkeypatch):
     monkeypatch.setattr(dist, "all_gather", dummy_all_gather)
 
     input_split_sizes = [1, 1]
-    ep_indx = torch.tensor([0], [1])
+    ep_indx = torch.tensor([[0], [1]])
     metadata = triton_dist.ReduceScatterMetadata(input_split_sizes=input_split_sizes, ep_indx=ep_indx, EP=2)
     # Assume the current ep rank is 0.
     # [1, 2] comes from rank 0
