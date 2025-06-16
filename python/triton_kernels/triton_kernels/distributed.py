@@ -67,7 +67,12 @@ def all_gather(x: torch.Tensor, dim=0) -> torch.Tensor:
         return x
 
 
-def reduce_scatter(input_tensor: torch.Tensor, metadata: ReduceScatterMetadata = None, dim: int = 0) -> torch.Tensor:
+def reduce_scatter(
+    input_tensor: torch.Tensor,
+    metadata: ReduceScatterMetadata = None,
+    dim: int = 0,
+    op: dist.ReduceOp = dist.ReduceOp.SUM,
+) -> torch.Tensor:
     if _is_distributed_launch():
 
         def cast(dtype: torch.dtype) -> torch.dtype:
@@ -88,7 +93,10 @@ def reduce_scatter(input_tensor: torch.Tensor, metadata: ReduceScatterMetadata =
             for i in range(world_size):
                 ep_rank = i % metadata.EP
                 mask = torch.any(metadata.ep_indx == ep_rank, dim=1)
-                output_tensor[mask] += output_list[i]
+                if op == dist.ReduceOp.SUM:
+                    output_tensor[mask] += output_list[i]
+                else:
+                    raise NotImplementedError(f"Reduce operation {op} is not implemented.")
             return output_tensor
         else:
             input_list = list(input_tensor.chunk(world_size, dim=dim))
@@ -96,7 +104,7 @@ def reduce_scatter(input_tensor: torch.Tensor, metadata: ReduceScatterMetadata =
             dtype = cast(input_tensor.dtype)
             input_list = [x.to(dtype) for x in input_list]
             output_tensor = input_tensor.new_empty(shape, dtype=dtype)
-            dist.reduce_scatter(output_tensor, input_list)
+            dist.reduce_scatter(output_tensor, input_list, op=op)
             return output_tensor
     else:
         return input_tensor
