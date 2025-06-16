@@ -83,7 +83,7 @@ def reduce_scatter(
                 return torch.float16
 
         world_size = dist.get_world_size()
-        if metadata.input_split_sizes:
+        if metadata and metadata.input_split_sizes:
             assert dim == 0, "metadata only works with dim=0"
             input_list = list(input_tensor.split(metadata.input_split_sizes, dim=0))
             output_list = all_to_all(input_list, dim=0)
@@ -91,7 +91,7 @@ def reduce_scatter(
             other_dims = input_tensor.shape[1:]
             output_tensor = input_tensor.new_zeros((n_tokens, ) + other_dims, dtype=cast(input_tensor.dtype))
             for i in range(world_size):
-                ep_rank = i % metadata.EP
+                ep_rank = i // metadata.EP
                 mask = torch.any(metadata.ep_indx == ep_rank, dim=1)
                 if op == dist.ReduceOp.SUM:
                     output_tensor[mask] += output_list[i]
@@ -151,13 +151,13 @@ def routing(logits, n_expts_act, sm_first=False, expt_indx=None, n_rows=None, EP
         ep_indx = None
         if EP > 1:
             # Distributed-EP
-            ep_rank = dist.get_rank() % TP
+            ep_rank = dist.get_rank() // TP
             # Figure out how many tokens are assigned to each expert
             expt_scal_list = []
             expt_indx_list = []
             ep_indx = expt_indx // chunk_size
-            for _ in range(TP):
-                for i in range(EP):
+            for i in range(EP):
+                for _ in range(TP):
                     mask = torch.any(ep_indx == i, dim=1)
                     expt_scal_masked = expt_scal[mask]
                     expt_indx_masked = expt_indx[mask]
