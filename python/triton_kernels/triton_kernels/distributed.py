@@ -111,7 +111,7 @@ def all_to_all(input_list: list[torch.Tensor], dim: int = 0) -> list[torch.Tenso
                 if d != dim and t.size(d) != input_list[0].size(d):
                     raise ValueError("All tensors must have the same size in all dimensions except the specified one.")
         input_sizes = [t.size(dim) for t in input_list]
-        input_sizes = torch.tensor(input_sizes).unsqueeze(0)
+        input_sizes = torch.tensor(input_sizes, device=input_list[0].device).unsqueeze(0)
         input_sizes = all_gather(input_sizes, dim=0)
         output_split_sizes = input_sizes[:, dist.get_rank()].tolist()
         other_dims = list(input_list[0].shape[:dim] + input_list[0].shape[dim + 1:])
