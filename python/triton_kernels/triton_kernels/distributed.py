@@ -67,12 +67,8 @@ def all_gather(x: torch.Tensor, dim=0) -> torch.Tensor:
         return x
 
 
-def reduce_scatter(
-    input_tensor: torch.Tensor,
-    metadata: ReduceScatterMetadata = None,
-    dim: int = 0,
-    op: dist.ReduceOp = dist.ReduceOp.SUM,
-) -> torch.Tensor:
+def reduce_scatter(input_tensor: torch.Tensor, metadata: ReduceScatterMetadata = None, dim: int = 0,
+                   op: dist.ReduceOp.RedOpType = dist.ReduceOp.SUM) -> torch.Tensor:
     if _is_distributed_launch():
 
         def cast(dtype: torch.dtype) -> torch.dtype:
