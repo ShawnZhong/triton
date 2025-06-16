@@ -78,7 +78,7 @@ def reduce_scatter(input_tensor: torch.Tensor, metadata: ReduceScatterMetadata =
                 return torch.float16
 
         world_size = dist.get_world_size()
-        if metadata:
+        if metadata.input_split_sizes:
             assert dim == 0, "metadata only works with dim=0"
             input_list = input_tensor.split(metadata.input_split_sizes, dim=0)
             output_list = all_to_all(input_list, dim=0)
