@@ -24,7 +24,7 @@ def dummy_all_to_all(output_list, input_list):
     output_list[1].copy_(input_list[0])
 
 
-def dummy_reduce_scatter(out, x_list):
+def dummy_reduce_scatter(out, x_list, op):
     out.copy_(x_list[0] * 2)
 
 
