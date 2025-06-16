@@ -80,7 +80,7 @@ def reduce_scatter(input_tensor: torch.Tensor, metadata: ReduceScatterMetadata =
         world_size = dist.get_world_size()
         if metadata.input_split_sizes:
             assert dim == 0, "metadata only works with dim=0"
-            input_list = input_tensor.split(metadata.input_split_sizes, dim=0)
+            input_list = list(input_tensor.split(metadata.input_split_sizes, dim=0))
             output_list = all_to_all(input_list, dim=0)
             n_tokens = metadata.ep_indx.size(dim)
             other_dims = input_tensor.shape[1:]
@@ -92,7 +92,6 @@ def reduce_scatter(input_tensor: torch.Tensor, metadata: ReduceScatterMetadata =
             return output_tensor
         else:
             input_list = list(input_tensor.chunk(world_size, dim=dim))
-            # build output shape
             shape = input_list[0].shape
             dtype = cast(input_tensor.dtype)
             input_list = [x.to(dtype) for x in input_list]
@@ -144,23 +143,24 @@ def routing(logits, n_expts_act, sm_first=False, expt_indx=None, n_rows=None, EP
         ep_indx = None
         if EP > 1:
             # Distributed-EP
-            ep_rank = dist.get_rank() // TP
+            ep_rank = dist.get_rank() % TP
             # Figure out how many tokens are assigned to each expert
             expt_scal_list = []
             expt_indx_list = []
-            for i in range(EP):
-                mask = torch.any(expt_indx == i, dim=1)
-                expt_scal_masked = expt_scal[mask]
-                expt_indx_masked = expt_indx[mask]
-                expt_scal_list += [expt_scal_masked] * TP
-                expt_indx_list += [expt_indx_masked] * TP
+            ep_indx = expt_indx // chunk_size
+            for _ in range(TP):
+                for i in range(EP):
+                    mask = torch.any(ep_indx == i, dim=1)
+                    expt_scal_masked = expt_scal[mask]
+                    expt_indx_masked = expt_indx[mask]
+                    expt_scal_list.append(expt_scal_masked)
+                    expt_indx_list.append(expt_indx_masked)
             expt_scal_list = all_to_all(expt_scal_list, dim=0)
             expt_indx_list = all_to_all(expt_indx_list, dim=0)
             output_split_sizes = [x.size(0) for x in expt_scal_list]
             expt_scal = torch.cat(expt_scal_list, dim=0)
             expt_indx = torch.cat(expt_indx_list, dim=0)
-            ep_indx = expt_indx // chunk_size
-            mask = ep_indx == ep_rank
+            mask = (expt_indx // chunk_size) == ep_rank
             expt_indx -= ep_rank * chunk_size
             expt_scal = expt_scal.masked_fill(~mask, 0)
             expt_indx = expt_indx.masked_fill(~mask, n_expts_tot)
@@ -192,7 +192,7 @@ def routing(logits, n_expts_act, sm_first=False, expt_indx=None, n_rows=None, EP
             RoutingData(gate_scal, hist, n_expts_tot // EP, n_expts_act, expt_data=expt_data),
             gather_indx,
             scatter_indx,
-            ReduceScatterMetadata(input_split_sizes=output_split_sizes, ep_indx=expt_indx, EP=EP, TP=TP),
+            ReduceScatterMetadata(input_split_sizes=output_split_sizes, ep_indx=ep_indx, EP=EP, TP=TP),
         )
     else:
         return *triton_kernels.routing.routing(logits, n_expts_act, sm_first, expt_indx, EP, n_rows), None
