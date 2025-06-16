@@ -97,6 +97,7 @@ def test_routing_distributed_EP(monkeypatch):
     monkeypatch.setattr(dist, "get_world_size", lambda: 2)
     monkeypatch.setattr(dist, "get_rank", lambda: 0)
     monkeypatch.setattr(dist, "all_gather", dummy_all_gather)
+    monkeypatch.setattr(dist, "all_to_all", dummy_all_to_all)
 
     # NOTE: must set `device="cuda"` since `triton_dist.routing` expects CUDA tensors.
     logits = torch.tensor([[0.1, 0.2, 0.4, 0.3], [0.5, 0.4, 0.3, 0.1]], device="cuda", dtype=torch.float16)
