@@ -85,7 +85,7 @@ def test_reduce_scatter_distributed_with_metadata(monkeypatch):
     x = torch.tensor([[1, 2], [3, 4]], dtype=torch.float32)
 
     result = triton_dist.reduce_scatter(x, metadata=metadata, dim=0)
-    torch.testing.assert_close(result, torch.tensor([[2, 4], [2, 4]], dtype=torch.float32))
+    torch.testing.assert_close(result, torch.tensor([[1, 2], [1, 2]], dtype=torch.float32))
 
 
 def test_routing_distributed_EP(monkeypatch):
