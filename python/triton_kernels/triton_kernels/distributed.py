@@ -182,11 +182,11 @@ def routing(logits, n_expts_act, sm_first=False, expt_indx=None, n_rows=None, EP
         gate_indx[gate_indx >= mask.sum()] = -1
         gate_scal = expt_scal[topk_indx]
         # histogram of tokens over experts
-        hist = torch.histc(expt_indx[~mask], bins=chunk_size, min=0, max=chunk_size)
+        hist = torch.histc(expt_indx[mask], bins=chunk_size, min=0, max=chunk_size)
         # pack the matmul data structure
         gather_indx = GatherIndx(src_indx=topk_indx.int(), dst_indx=gate_indx.int())
         scatter_indx = ScatterIndx(src_indx=gate_indx.int(), dst_indx=topk_indx.int())
-        n_gates = topk_indx.numel()
+        n_gates = topk_indx[mask].numel()
         expt_data = compute_expt_data(hist, n_expts_tot // EP, n_gates)
         return (
             RoutingData(gate_scal, hist, n_expts_tot // EP, n_expts_act, expt_data=expt_data),
