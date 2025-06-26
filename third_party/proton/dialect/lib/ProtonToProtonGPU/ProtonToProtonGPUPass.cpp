@@ -322,6 +322,7 @@ public:
                                      scopeInfo, clockExtension)))
       return failure();
 
+    builder.create<gpu::InitializeOp>(loc, profileMem);
     func.walk([&](triton::ReturnOp ret) {
       builder.setInsertionPoint(ret);
       builder.create<mlir::gpu::BarrierOp>(loc);
