@@ -311,6 +311,7 @@ public:
     Value profileMem = builder.create<gpu::GlobalScratchAllocOp>(
         loc, triton::getPointerType(builder.getI32Type()),
         allocProfileScratchSize, profileScratchAlignment);
+    builder.create<gpu::GlobalTimeOp>(loc, profileMem, /*index=*/0);
 
     if (hasOperator<Operation, triton::gpu::WarpSpecializeOp>(
             func.getOperation()))
@@ -322,11 +323,12 @@ public:
                                      scopeInfo, clockExtension)))
       return failure();
 
-    builder.create<gpu::InitializeOp>(loc, profileMem);
     func.walk([&](triton::ReturnOp ret) {
       builder.setInsertionPoint(ret);
       builder.create<mlir::gpu::BarrierOp>(loc);
+      builder.create<gpu::GlobalTimeOp>(loc, profileMem, /*index=*/1);
       builder.create<gpu::FinalizeOp>(loc, segment, profileMem);
+      builder.create<gpu::GlobalTimeOp>(loc, profileMem, /*index=*/2);
     });
 
     return success();
