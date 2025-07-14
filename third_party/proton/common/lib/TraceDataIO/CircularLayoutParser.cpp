@@ -123,7 +123,8 @@ void CircularLayoutParser::parseSegment(
 
           if (activeProfileEvent.first->cycle >
               activeProfileEvent.second->cycle) {
-            throw ClockOverflowException("Clock overflow");
+            std::cerr << "Warning: clock overflow" << std::endl;
+            // throw ClockOverflowException("Clock overflow");
           }
           trace.profileEvents.push_back(activeProfileEvent);
         } else {
