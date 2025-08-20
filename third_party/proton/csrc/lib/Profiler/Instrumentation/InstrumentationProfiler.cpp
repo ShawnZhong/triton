@@ -242,7 +242,8 @@ void InstrumentationProfiler::exitInstrumentedOp(uint64_t streamId,
                         blockTrace.blockId, blockTrace.procId, trace.uid,
                         device, static_cast<uint64_t>(runtime->getDeviceType()),
                         timeShiftCost, blockTrace.initTime,
-                        blockTrace.preFinalTime, blockTrace.postFinalTime));
+                        blockTrace.preFinalTime, blockTrace.postFinalTime,
+                        blockTrace.initCycle, blockTrace.preFinalCycle));
               }
             }
           }

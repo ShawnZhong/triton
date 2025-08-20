@@ -105,6 +105,10 @@ struct InitializeOpConversion
     //  | post-final time               |
     //  | (2 words)                     |
     //  +-------------------------------+ 10
+    //  | init cycle (1 word)           |
+    //  +-------------------------------+ 11
+    //  | pre-final cycle (1 word)      |
+    //  +-------------------------------+ 12
 
     Value threadId = getThreadId(rewriter, loc);
     Value isFirstThread = b.icmp_eq(threadId, b.i32_val(0));
@@ -140,6 +144,13 @@ struct InitializeOpConversion
         b.gep(scratchPtrTy, i32_ty, scratchPtr, gmemInitTimeOffset);
     Value initTime = targetInfo.globalTime(rewriter, loc);
     b.store(initTime, gmemInitTimePtr);
+
+    // Write back 'init cycle'.
+    Value gmemInitCycleOffset = b.i32_val(10);
+    Value gmemInitCyclePtr =
+        b.gep(scratchPtrTy, i32_ty, scratchPtr, gmemInitCycleOffset);
+    Value initCycle = targetInfo.clock(rewriter, loc, false);
+    b.store(initCycle, gmemInitCyclePtr);
 
     // Add the 'else' block and the condition.
     Block *thenBlock = rewriter.splitBlock(ifBlock, op->getIterator());
@@ -246,6 +257,13 @@ struct FinalizeOpConversion
     Value preFinalTime = targetInfo.globalTime(rewriter, loc);
     b.store(preFinalTime, gmemPreFinalTimePtr);
 
+    // Write back 'pre-final cycle'.
+    Value gmemPreFinalCycleOffset = b.i32_val(11);
+    Value gmemPreFinalCyclePtr =
+        b.gep(scratchPtrTy, i32_ty, scratchPtr, gmemPreFinalCycleOffset);
+    Value preFinalCycle = targetInfo.clock(rewriter, loc, false);
+    b.store(preFinalCycle, gmemPreFinalCyclePtr);
+
     // Add the 'else' block and the condition.
     Block *thenBlock = rewriter.splitBlock(ifBlock, op->getIterator());
     rewriter.setInsertionPointToEnd(prevBlock);
@@ -297,6 +315,7 @@ private:
     Block *ifBlock = rewriter.splitBlock(prevBlock, op->getIterator());
     rewriter.setInsertionPointToStart(ifBlock);
 
+    // Write back 'post-final time'.
     Value gmemPostFinalTimeOffset = b.i32_val(8);
     Value gmemPostFinalTimePtr =
         b.gep(scratchPtrTy, i32_ty, scratchPtr, gmemPostFinalTimeOffset);

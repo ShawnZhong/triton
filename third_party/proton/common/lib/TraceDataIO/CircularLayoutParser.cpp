@@ -46,6 +46,8 @@ void CircularLayoutParser::parseMetadata() {
   bt.initTime = decoder.decode<I64Entry>()->value;
   bt.preFinalTime = decoder.decode<I64Entry>()->value;
   bt.postFinalTime = decoder.decode<I64Entry>()->value;
+  bt.initCycle = decoder.decode<I32Entry>()->value;
+  bt.preFinalCycle = decoder.decode<I32Entry>()->value;
 
   std::vector<uint32_t> countVec;
   for (int i = 0; i < getConfig().totalUnits; i++) {

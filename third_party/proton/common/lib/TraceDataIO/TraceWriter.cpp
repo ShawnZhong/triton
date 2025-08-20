@@ -186,8 +186,9 @@ void StreamChromeTraceWriter::writeKernel(json &object,
             name = "scope_" + std::to_string(scopeId);
           else
             name = metadata->scopeName.at(scopeId);
-          // TODO: We currently assume 1GHz clock frequency.
-          int64_t freq = 1; // 1GHz = 1e9 cycles per sec = 1 cycle per ns
+          double freq =
+              (static_cast<double>(bt->preFinalCycle) - bt->initCycle) /
+              (bt->preFinalTime - bt->initTime);
           int64_t tsCycle = static_cast<int64_t>(event.first->cycle) -
                             blockToStartCycle[ctaId];
           int64_t tsNs = bt->initTime + tsCycle / freq;

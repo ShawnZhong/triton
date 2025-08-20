@@ -338,6 +338,10 @@ convertToTimelineTrace(TraceData::Trace *trace,
           getInt64Value(blockEvent.cycleMetric, CycleMetric::PreFinalTime);
       blockTrace.postFinalTime =
           getInt64Value(blockEvent.cycleMetric, CycleMetric::PostFinalTime);
+      blockTrace.initCycle =
+          getInt64Value(blockEvent.cycleMetric, CycleMetric::InitCycle);
+      blockTrace.preFinalCycle =
+          getInt64Value(blockEvent.cycleMetric, CycleMetric::PreFinalCycle);
       // Conservative estimation of the number of warps in a CTA.
       blockTrace.traces.reserve(16);
 
